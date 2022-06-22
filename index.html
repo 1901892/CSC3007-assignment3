@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+    <html>
+        <head>
+            <title>SG Population Info</title>
+
+            <!-- Viewport for responsive web design -->
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+
+            <!-- D3.js import --> 
+            <script src="https://d3js.org/d3.v7.min.js"></script>
+
+            <!-- D3-legend import --> 
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.min.js"></script>
+
+            <!-- CSS Bootstrap import -->
+            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+            <!-- CSS Google fonts import -->
+            <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+        
+            <!-- CSS style sheet -->
+            <style>
+                body {
+                    background-image: url("https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Singapore_skyline_from_Pearl_Bank.jpg/2560px-Singapore_skyline_from_Pearl_Bank.jpg");
+                    background-position: center;
+                    background-repeat: no-repeat;
+                    background-attachment: fixed;
+                    background-size: cover;
+                }
+                h1 {
+                    color: lightskyblue;
+                    font-size: 50px;
+                    text-align: center;
+                    font-family: 'Roboto', sans-serif;
+                }
+                .header {
+                    background: black;
+                    opacity: 85%;
+                }
+                .container {
+                    background: lightskyblue;
+                    opacity: 95%;
+                    padding: 5px;
+                }
+                path {
+                    stroke: black;
+                    stroke-width: 0.5;
+                    opacity: 0.9;
+                }
+            </style>
+        </head>
+
+    <body>
+        <div class="header">
+            <h1>Singapore Population Information</h1>
+        </div>
+
+        <div class="container text-center">
+            <h5>Population information of Singapore as of 2021, based on Singstat's population data</h5>
+            <svg></svg>
+            <script>
+                let width = 1000, height = 600
+
+                let svg = d3.select("svg")
+                    .attr("viewBox", "0 0 " + width + " " + height)
+
+                //Load external data
+                Promise.all([d3.json("sgmap.json"), d3.csv("population2021.csv")]).then(data => {
+
+                //console.log(data[0])
+                //console.log(data[1])
+
+                //Map object to hold population data for each subzone
+                let populationdata = new Map()
+
+                //Map the population data to each of the subzones
+                for (var i = 0; i < data[1].length; i++) {
+                    subzone = data[1][i]["Subzone"].toUpperCase()
+                    population = data[1][i]["Population"]
+                    populationdata.set(subzone, population)
+                }
+
+                //Map and projection
+                var projection = d3.geoMercator()
+                    .center([103.851959, 1.290270])
+                    .fitExtent([[20, 20], [980, 580]], data[0])
+
+                let geopath = d3.geoPath().projection(projection)
+
+                //Define the domain for use with color scale and legend
+                let domain = [100, 500, 1000, 5000, 10000, 20000, 40000, 60000, 80000]
+
+                //Define color scale
+                var colorscale = d3.scaleThreshold()
+                    .domain(domain)
+                    .range(d3.schemeYlOrBr[9])
+
+                //Define tooltip
+                var tooltip = d3.select("body")
+                    .append("div")
+                    .attr('class', 'd3-tooltip')
+                    .style('position', 'absolute')
+                    .style('visibility', 'hidden')
+                    .style('padding', '10px')
+                    .style('border-radius', '10px')
+                    .style('color', 'white')
+                    .style('background', 'rgba(0,0,0,0.8)')
+                    .style('pointer-events', 'none')
+
+                svg.append("g")
+                    .attr("id", "districts")
+                    .selectAll("path")
+                    .data(data[0].features)
+                    .enter()
+                    .append("path")
+                    .attr("d", geopath)
+                    .attr("fill", function(d) {
+                        d.total = populationdata.get(d.properties.Name) || 0
+                        return colorscale(d.total)
+                    })
+                    .on('mouseover', function(event, d) {
+                        d3.select(event.currentTarget)
+                            .style("stroke-width", 1)
+                            .style("opacity", 1)
+                        tooltip
+                            .html(d.properties.Name + '<br> Population: ' + d.total)
+                            .style('visibility', 'visible')
+                    })
+                    .on('mousemove', function(event, d) {
+                        tooltip
+                            .style('left', event.pageX + 'px')
+                            .style('top', event.pageY + 'px')
+                    })
+                    .on('mouseout', function(d) {
+                        d3.select(event.currentTarget)
+                            .style("stroke-width", 0.5)
+                            .style("opacity", 0.9)
+                        tooltip
+                            .style('visibility', 'hidden')
+                    })
+
+                    //Define legend
+                    var legend = d3.legendColor()
+                        .labels(domain)
+                        .scale(colorscale)
+                        .title("Population")
+                        .orient("horizontal")
+                        .shapeWidth(35)
+
+                    //Add legend to the svg
+                    svg.append("g")
+                        .attr("transform", "translate(600,500)")
+                        .style("font-size", "10px")
+                        .call(legend)
+                })
+            </script>
+        </div>
+    </body>
+</html>
